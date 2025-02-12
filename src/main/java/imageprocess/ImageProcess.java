@@ -8,16 +8,17 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import org.imgscalr.Scalr;
 
 public class ImageProcess {
-    File referenceImage = new File("src/main/java/assets/image/image_reference_.jpg");
+    File referenceImage = new File("src/main/java/assets/image/reference.jpg");
     HashMap<String, BufferedImage> imageMap = new HashMap<>();
-    HashMap<String, Color> mappedDataset = new HashMap<>();
+    ConcurrentHashMap<String, Color> mappedDataset =  new ConcurrentHashMap<>();
     File dataset = new File("src/main/java/assets/image/dataset");
-    int blockSIze = 10;
+    int blockSIze = 30; // Tamanho do bloco em Pixels
 
     public Color calcAverageColor(BufferedImage image) throws IOException {
         int width = image.getWidth();
@@ -27,10 +28,10 @@ public class ImageProcess {
 
         for(int x = 0; x < width; x++) {
             for(int y = 0; y < height; y++) {
-                Color colorPixel = new Color(image.getRGB(x, y));
-                sumR += colorPixel.getRed();
-                sumG += colorPixel.getGreen();
-                sumB += colorPixel.getBlue();
+                var colorPixel = image.getRGB(x, y);
+                sumR += (colorPixel >> 16) & 0xFF;
+                sumG += (colorPixel >> 8) & 0xFF;
+                sumB += colorPixel & 0xFF;
             }
         }
 
@@ -43,11 +44,17 @@ public class ImageProcess {
     }
 
     public void addImageOnImage(int xPosition, int yPosition, BufferedImage reference, BufferedImage image) throws IOException {
+        BufferedImage finalImage = new BufferedImage(reference.getWidth(), reference.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = finalImage.createGraphics();
+        g.drawImage(reference, 0, 0, null);
+        g.dispose();
+
         int height = blockSIze, width = blockSIze;
 
         var graphicG = reference.createGraphics();
 
         var resizedImage = resizeImage(image, width, height);
+
         graphicG.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         graphicG.drawImage(resizedImage, xPosition, yPosition, width, height, null);
         graphicG.dispose();
@@ -89,18 +96,16 @@ public class ImageProcess {
 
         File[] images = dataset.listFiles(imageFilter);
 
-
         if(images == null)
             return;
 
         System.out.println("Processing images in " + images.length + " images");
 
-
-        var executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        ArrayList<Future<?>> futures = new ArrayList<>();
+        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        CompletionService<Void> completionService = new ExecutorCompletionService<>(executor);
 
         for(File imageFile : images) {
-            futures.add(executor.submit(() -> {
+            completionService.submit(() -> {
                 try {
                     var image = ImageIO.read(imageFile);
                     Color color;
@@ -109,15 +114,8 @@ public class ImageProcess {
                 } catch (IOException e) {
                     System.err.println("Erro ao processar a imagem: " + imageFile.getAbsolutePath());
                 }
-            }));
-        }
-
-        for(var future : futures) {
-            try {
-                future.get();
-            }catch (Exception e) {
-                e.printStackTrace();
-            }
+                return  null;
+            });
         }
 
         executor.shutdown();
@@ -128,44 +126,28 @@ public class ImageProcess {
 
     public void generateImage() throws Exception {
         var start = System.currentTimeMillis();
+        System.out.println("Initializing generating image");
 
         var image = ImageIO.read(this.referenceImage);
 
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        ArrayList<Future<?>> futures = new ArrayList<>();
-
         Map<String, BufferedImage> imageCache = new ConcurrentHashMap<>();
 
-        for(var block : imageMap.entrySet()) {
-            futures.add(executor.submit(() -> {
-                String closestImagePath = "";
-                double closestDistance = Double.MAX_VALUE;
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
 
+        for (var block : imageMap.entrySet()) {
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 var key = block.getKey();
                 var colorReferenceImage = block.getValue();
 
-                try{
+                try {
                     var imageMedianColor = calcAverageColor(colorReferenceImage);
 
-                    for(var images : mappedDataset.entrySet()){
-                        var path = images.getKey();
-                        var colorUsedImage = images.getValue();
-
-                        var euclidianResult = euclideanDistance(imageMedianColor, colorUsedImage);
-
-                        if(euclidianResult < closestDistance){
-                            closestDistance = euclidianResult;
-                            closestImagePath = path;
-                        }
-                    }
+                    String closestImagePath = findClosestImagePath(imageMedianColor, mappedDataset);
 
                     var splitKey = key.split("_");
                     var xPosition = Integer.parseInt(splitKey[0]);
                     var yPosition = Integer.parseInt(splitKey[1]);
-
-                    if(closestImagePath.isEmpty()){
-                        throw new Exception("ERRO AO RESGATAR IMAGEM");
-                    }
 
                     BufferedImage imageUsed = imageCache.computeIfAbsent(closestImagePath, path -> {
                         try {
@@ -176,25 +158,39 @@ public class ImageProcess {
                         }
                     });
 
+                    if (imageUsed == null) {
+                        throw new Exception("ERRO AO RESGATAR IMAGEM");
+                    }
+
                     addImageOnImage(xPosition, yPosition, image, imageUsed);
-                }catch (Exception e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
+            }, executor);
 
-            }));
+            futures.add(future);
         }
 
-        for (var future : futures) {
-            try {
-                future.get();
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        executor.shutdown();
+
+        var end = System.currentTimeMillis();
+        System.out.println("Imagem gerada com sucesso em " + (end - start) + "ms");
+    }
+
+    private String findClosestImagePath(Color imageMedianColor, Map<String, Color> mappedDataset) {
+        double closestDistance = Double.MAX_VALUE;
+        String closestImagePath = "";
+
+        for (var entry : mappedDataset.entrySet()) {
+            double distance = euclideanDistance(imageMedianColor, entry.getValue());
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestImagePath = entry.getKey();
             }
         }
 
-        executor.shutdown();
-        var end = System.currentTimeMillis();
-        System.out.println("Imagem gerada com sucesso em " + (end - start) + "ms");
+        return closestImagePath;
     }
 
     public double euclideanDistance(Color c1, Color c2) {
@@ -202,9 +198,9 @@ public class ImageProcess {
         int euclidianG = c1.getGreen() - c2.getGreen();
         int euclidianB = c1.getBlue() - c2.getBlue();
 
-        double sumEuclidian = Math.pow(euclidianR, 2) + Math.pow(euclidianG, 2) + Math.pow(euclidianB, 2);
+        double sumEuclidean = Math.pow(euclidianR, 2) + Math.pow(euclidianG, 2) + Math.pow(euclidianB, 2);
 
-        return Math.sqrt(sumEuclidian);
+        return Math.sqrt(sumEuclidean);
     }
 
 }
