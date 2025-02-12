@@ -1,5 +1,7 @@
 package imageprocess;
 
+import org.imgscalr.Scalr;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -11,7 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
-import org.imgscalr.Scalr;
 
 public class ImageProcess {
     File referenceImage = new File("src/main/java/assets/image/reference.jpg");
