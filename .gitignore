@@ -4,8 +4,8 @@ out/
 !**/src/test/**/out/
 
 
-src/main/java/assets/dataset/
-src/main/java/assets/image/
+src/main/java/assets/image/dataset/**
+src/main/java/assets/image/result/**
 
 ### Eclipse ###
 .apt_generated
