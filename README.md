@@ -4,8 +4,8 @@ PhotoMorph é uma aplicação Java que recebe uma imagem de referência e, a par
 
 
 ## Exemplo: 
-[Imagem Referência](src/example/reference.jpg)
-[Imagem Gerada](src/example/result_image.jpg)
+- [Imagem Referência](example/reference.jpg)
+- [Imagem Gerada](example/result_image.jpg)
 
 ## Funcionalidades
 - Divisão da Imagem de Referência: A imagem de referência é dividida em blocos menores para processamento.
