@@ -69,7 +69,7 @@ photomorph/
     - Afins de teste usei o [Kaggle](https://www.kaggle.com/datasets/tunguz/1-million-fake-faces?resource=download "Ir para o Kaggle") usando 30 Mil imagens
 4. Execute a aplicação:
 ```bash
-  mvn exec:java -Dexec.mainClass="imageprocess.ImageProcess"
+  mvn exec:java -Dexec.mainClass="Main"
 ```
 5. Resultado
    - A imagem gerada será salva em src/main/resources/assets/image/result/result_image.jpg.
