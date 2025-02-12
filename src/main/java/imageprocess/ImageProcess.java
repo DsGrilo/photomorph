@@ -15,11 +15,12 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 public class ImageProcess {
-    File referenceImage = new File("src/main/java/assets/image/reference.jpg");
+    File REFERENCE_IMAGE_PATH = new File("src/main/java/assets/image/reference.jpg");
     HashMap<String, BufferedImage> imageMap = new HashMap<>();
     ConcurrentHashMap<String, Color> mappedDataset =  new ConcurrentHashMap<>();
-    File dataset = new File("src/main/java/assets/image/dataset");
-    int blockSIze = 30; // Tamanho do bloco em Pixels
+    File DATASET_PATH = new File("src/main/java/assets/image/dataset");
+    String RESULT_IMAGE_PATH = "src/main/java/assets/image/result";
+    int BLOCKSIZE = 30; // Tamanho do bloco em Pixels
 
     public Color calcAverageColor(BufferedImage image) throws IOException {
         int width = image.getWidth();
@@ -50,7 +51,7 @@ public class ImageProcess {
         g.drawImage(reference, 0, 0, null);
         g.dispose();
 
-        int height = blockSIze, width = blockSIze;
+        int height = BLOCKSIZE, width = BLOCKSIZE;
 
         var graphicG = reference.createGraphics();
 
@@ -60,7 +61,7 @@ public class ImageProcess {
         graphicG.drawImage(resizedImage, xPosition, yPosition, width, height, null);
         graphicG.dispose();
 
-        var resultImage = new File("src/main/java/assets/image/result", "result_image.jpg");
+        var resultImage = new File(RESULT_IMAGE_PATH, "result_image.jpg");
         ImageIO.write(reference, "jpg", resultImage);
     }
 
@@ -69,9 +70,9 @@ public class ImageProcess {
     }
 
     public void divideImageIntoBlocks() throws IOException {
-        var reference = ImageIO.read(referenceImage);
+        var reference = ImageIO.read(REFERENCE_IMAGE_PATH);
 
-        int blockWidth = blockSIze, blockHeight = blockSIze;
+        int blockWidth = BLOCKSIZE, blockHeight = BLOCKSIZE;
         int imageWidth = reference.getWidth();
         int imageHeight = reference.getHeight();
 
@@ -95,7 +96,7 @@ public class ImageProcess {
         var start = System.currentTimeMillis();
         FilenameFilter imageFilter = (dir, name) -> name.toLowerCase().endsWith(".jpg");
 
-        File[] images = dataset.listFiles(imageFilter);
+        File[] images = DATASET_PATH.listFiles(imageFilter);
 
         if(images == null)
             return;
@@ -129,7 +130,7 @@ public class ImageProcess {
         var start = System.currentTimeMillis();
         System.out.println("Initializing generating image");
 
-        var image = ImageIO.read(this.referenceImage);
+        var image = ImageIO.read(this.REFERENCE_IMAGE_PATH);
 
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         Map<String, BufferedImage> imageCache = new ConcurrentHashMap<>();
