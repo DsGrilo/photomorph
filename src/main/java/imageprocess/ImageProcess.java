@@ -1,5 +1,6 @@
 package imageprocess;
 
+import imageprocess.colorSimilarity.CielabDistance;
 import org.imgscalr.Scalr;
 
 import javax.imageio.ImageIO;
@@ -20,7 +21,7 @@ public class ImageProcess {
     ConcurrentHashMap<String, Color> mappedDataset =  new ConcurrentHashMap<>();
     File DATASET_PATH = new File("src/main/java/assets/image/dataset");
     String RESULT_IMAGE_PATH = "src/main/java/assets/image/result";
-    int BLOCKSIZE = 30; // Tamanho do bloco em Pixels
+    int BLOCKSIZE = 20; // Tamanho do bloco em Pixels
 
     public Color calcAverageColor(BufferedImage image) throws IOException {
         int width = image.getWidth();
@@ -145,7 +146,7 @@ public class ImageProcess {
                 try {
                     var imageMedianColor = calcAverageColor(colorReferenceImage);
 
-                    String closestImagePath = findClosestImagePath(imageMedianColor, mappedDataset);
+                    String closestImagePath = findClosestImagePath(imageMedianColor);
 
                     var splitKey = key.split("_");
                     var xPosition = Integer.parseInt(splitKey[0]);
@@ -180,12 +181,30 @@ public class ImageProcess {
         System.out.println("Imagem gerada com sucesso em " + (end - start) + "ms");
     }
 
-    private String findClosestImagePath(Color imageMedianColor, Map<String, Color> mappedDataset) {
+    private String findClosestImagePath(Color imageMedianColor) {
         double closestDistance = Double.MAX_VALUE;
         String closestImagePath = "";
 
+        var rgbToXyzReference = CielabDistance.rgbToXyz(
+                imageMedianColor.getRed(),
+                imageMedianColor.getGreen(),
+                imageMedianColor.getBlue());
+
+        var xyzToLabReference =  CielabDistance.xyzToLab(rgbToXyzReference[0], rgbToXyzReference[1], rgbToXyzReference[2]);
+
         for (var entry : mappedDataset.entrySet()) {
-            double distance = euclideanDistance(imageMedianColor, entry.getValue());
+
+            var colorDataSet =  entry.getValue();
+
+            var rgbToXyz = CielabDistance.rgbToXyz(
+                    colorDataSet.getRed(),
+                    colorDataSet.getGreen(),
+                    colorDataSet.getBlue());
+
+            var xyzToLab =  CielabDistance.xyzToLab(rgbToXyz[0], rgbToXyz[1], rgbToXyz[2]);
+
+            var distance = CielabDistance.calculateDeltaE(xyzToLab, xyzToLabReference);
+
             if (distance < closestDistance) {
                 closestDistance = distance;
                 closestImagePath = entry.getKey();
@@ -195,6 +214,7 @@ public class ImageProcess {
         return closestImagePath;
     }
 
+    @Deprecated
     public double euclideanDistance(Color c1, Color c2) {
         int euclidianR = c1.getRed() - c2.getRed();
         int euclidianG = c1.getGreen() - c2.getGreen();

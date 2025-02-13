@@ -1,4 +1,5 @@
 import imageprocess.ImageProcess;
+import imageprocess.colorSimilarity.CielabDistance;
 
 public class Main {
     public static void main(String[] args) {
